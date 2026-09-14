@@ -1,0 +1,10 @@
+import {readFile,writeFile,mkdir,cp,rm} from 'node:fs/promises';
+const read=p=>readFile(p,'utf8');
+const seed=JSON.parse(await read('db/seed.json'));
+const assets={};for(const [url,path,type] of [['/','web/index.html','text/html; charset=utf-8'],['/app.js','web/app.js','text/javascript; charset=utf-8'],['/style.css','web/style.css','text/css; charset=utf-8']])assets[url]={body:await read(path),type};
+const prelude=`const SEED=${JSON.stringify(seed)};\nconst ASSETS=${JSON.stringify(assets)};\n`;
+await rm('dist',{recursive:true,force:true});
+await mkdir('dist/server',{recursive:true});await mkdir('dist/.openai',{recursive:true});
+await writeFile('dist/server/index.js',prelude+await read('worker/index.js'));
+await cp('.openai/hosting.json','dist/.openai/hosting.json');await cp('drizzle','dist/.openai/drizzle',{recursive:true});
+console.log('Built Worker with 133 original questions, browser assets and schema migrations.');

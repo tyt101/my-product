@@ -1,0 +1,5 @@
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+export const topics=sqliteTable('topics',{id:text('id').primaryKey(),spaceId:text('space_id').notNull(),name:text('name').notNull(),thinking:text('thinking').notNull().default(''),position:integer('position').notNull(),revision:integer('revision').notNull().default(1),deleted:integer('deleted').notNull().default(0)},t=>[uniqueIndex('topics_active_name').on(t.spaceId,t.name).where(sql`${t.deleted}=0`)]);
+export const questions=sqliteTable('questions',{id:text('id').primaryKey(),spaceId:text('space_id').notNull(),topicId:text('topic_id').notNull().references(()=>topics.id),number:integer('number').notNull(),payload:text('payload').notNull(),revision:integer('revision').notNull().default(1),deleted:integer('deleted').notNull().default(0)},t=>[uniqueIndex('questions_space_number').on(t.spaceId,t.number)]);
+export const metadata=sqliteTable('metadata',{key:text('key').primaryKey(),value:text('value').notNull()});
