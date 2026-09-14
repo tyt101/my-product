@@ -1,9 +1,7 @@
-const OWNER_EMAIL='tangylin1998@gmail.com';
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 class ApiError extends Error{constructor(status,message){super(message);this.status=status;}}
 const fail=(status,message)=>{throw new ApiError(status,message);};
 const statement=(db,sql,...args)=>db.prepare(sql).bind(...args);
-function identity(request){const id=request.headers.get('oai-authenticated-user-id');const email=request.headers.get('oai-authenticated-user-email');return {signed_in:!!(id&&email),can_manage:!!id&&email?.trim().toLowerCase()===OWNER_EMAIL};}
 async function initialize(db){if(await statement(db,'SELECT value FROM metadata WHERE key=?','seed-v1').first())return;
  const inserts=[];
  for(const s of SEED){for(const [position,c] of s.categories.entries())inserts.push(statement(db,'INSERT OR IGNORE INTO topics(id,space_id,name,thinking,position) VALUES(?,?,?,?,?)',c.id,s.id,c.name,c.thinking_text||'',position));}
@@ -18,7 +16,7 @@ async function body(request){if(!request.headers.get('content-type')?.startsWith
 function required(v,label,max){if(typeof v!=='string'||!v.trim())fail(400,`请填写${label}。`);if(v.trim().length>max)fail(400,`${label}不能超过 ${max} 个字符。`);return v.trim();}
 function revision(v){if(!Number.isInteger(v)||v<1)fail(400,'缺少有效的内容版本，请刷新后重试。');return v;}
 function newId(v){if(typeof v!=='string'||!/^user-[a-f0-9-]{36}$/.test(v))fail(400,'请求编号无效。');return v;}
-async function mutate(request,db,path){const user=identity(request);if(!user.signed_in)fail(401,'请先登录管理账号。');if(!user.can_manage)fail(403,'此账号没有管理权限。');
+async function mutate(request,db,path){
  if(request.headers.get('origin')!==new URL(request.url).origin)fail(403,'请求来源不符，请在本站重试。');
  const b=await body(request);
  if(path==='/api/topics'&&request.method==='POST'){
@@ -46,10 +44,8 @@ async function mutate(request,db,path){const user=identity(request);if(!user.sig
 }
 export default {async fetch(request,env){const url=new URL(request.url),path=url.pathname;
  try{
-  if(path==='/api/session')return json(identity(request));
+  if(path==='/api/session')return json({can_manage:true});
   if(path.startsWith('/api/')){if(!env.DB)fail(503,'内容存储暂时不可用，请稍后重试。');
-   // Reject anonymous writes before any initialization or database operation.
-   if(request.method!=='GET'){const u=identity(request);if(!u.signed_in)fail(401,'请先登录管理账号。');if(!u.can_manage)fail(403,'此账号没有管理权限。');}
    await initialize(env.DB);if(path==='/api/content'&&request.method==='GET')return json(await content(env.DB));return await mutate(request,env.DB,path);
   }
   if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405});
